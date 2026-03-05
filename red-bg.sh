@@ -1,6 +1,8 @@
 #!/bin/bash
 # Flash terminal background red/dark until any HID input (mouse/keyboard),
 # then settle on solid dark red. Uses ioreg HIDIdleTime (no permissions needed).
+# Only changes background — never touches foreground color to avoid clashing
+# with the terminal's own text colors.
 
 pkill -f claude-red-flash 2>/dev/null
 pkill -f claude-input-watch 2>/dev/null
@@ -11,9 +13,9 @@ IDLE_AT_START=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF; exit}')
 # Start the flash loop as a named process
 nohup bash -c 'exec -a claude-red-flash bash -c '"'"'
 while true; do
-  printf "\e]11;#3D1111\a\e]10;#FFFFFF\a" >/dev/tty
+  printf "\e]11;#3D1111\a" >/dev/tty
   sleep 0.5
-  printf "\e]11;#000000\a\e]10;#FFFFFF\a" >/dev/tty
+  printf "\e]11;#000000\a" >/dev/tty
   sleep 0.5
 done
 '"'"'' >/dev/null 2>&1 &
@@ -27,7 +29,7 @@ while true; do
   NOW=$(ioreg -c IOHIDSystem | awk "/HIDIdleTime/ {print \$NF; exit}")
   if [ "$NOW" -lt "$START" ]; then
     pkill -f claude-red-flash 2>/dev/null
-    printf "\e]11;#3D1111\a\e]10;#FFFFFF\a" >/dev/tty
+    printf "\e]11;#3D1111\a" >/dev/tty
     exit 0
   fi
 done

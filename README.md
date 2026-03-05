@@ -1,6 +1,6 @@
 # Claude Code Red Flash Hook
 
-A simple Claude Code hook that flashes your terminal red when Claude is waiting for your input. Never miss when Claude finishes a task again.
+A simple Claude Code hook that flashes your terminal when Claude is waiting for your input. Never miss when Claude finishes a task again.
 
 ## The Problem
 
@@ -8,10 +8,12 @@ Claude Code runs autonomously, but when it stops and waits for input, there's no
 
 ## The Solution
 
-Two bash scripts (~40 lines total) that hook into Claude Code's lifecycle:
+Two bash scripts that hook into Claude Code's lifecycle:
 
-- **`red-bg.sh`** — Flashes the terminal between red and black. Once you touch your keyboard or mouse, it settles on a solid dark red background.
-- **`reset-bg.sh`** — Resets the terminal back to normal (black background, white text).
+- **`red-bg.sh`** — Flashes the terminal between light green and dark green. Once you touch your keyboard or mouse, it settles on a solid light green background. Uses light mint green (`#C8E6C9`) — the easiest color for human eyes (green sits at peak cone sensitivity).
+- **`reset-bg.sh`** — Switches to a white background with dark text palette, so all text remains readable.
+
+Both scripts remap the full ANSI palette (16 colors + extended) to ensure all text is readable against the background — including true-color text rendered by Claude Code.
 
 ### Hook triggers
 
@@ -24,7 +26,9 @@ Two bash scripts (~40 lines total) that hook into Claude Code's lifecycle:
 
 ## How It Works
 
-The flash script polls macOS `HIDIdleTime` via `ioreg` to detect any keyboard or mouse input — **no accessibility permissions needed**. When it detects input, the flashing stops and the background settles on solid dark red so you know Claude is waiting.
+The flash script polls macOS `HIDIdleTime` via `ioreg` to detect any keyboard or mouse input — **no accessibility permissions needed**. When it detects input, the flashing stops and the background settles on solid light green so you know Claude is waiting.
+
+Escape sequences are written to temp files to avoid nested-quoting issues in subshells — ensuring palette remaps actually apply.
 
 ## Installation
 
@@ -99,10 +103,10 @@ Add this to your `~/.claude/settings.json`:
 
 | State | Terminal |
 |---|---|
-| Claude is working | Normal (black background) |
-| Claude finished, you haven't noticed | Flashing red/black |
-| Claude finished, you looked | Solid dark red |
-| You submitted a prompt | Back to normal |
+| Claude is working | White background, dark text |
+| Claude finished, you haven't noticed | Flashing green/dark |
+| Claude finished, you looked | Solid light green |
+| You submitted a prompt | Back to white |
 
 ## License
 

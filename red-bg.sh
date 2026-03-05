@@ -1,70 +1,88 @@
 #!/bin/bash
-# Flash terminal background red/dark until any HID input (mouse/keyboard),
-# then settle on solid dark red. Uses ioreg HIDIdleTime (no permissions needed).
+# Flash terminal background green/dark until any HID input (mouse/keyboard),
+# then settle on solid light green.
 #
-# Remaps ALL 16 ANSI palette colors + extended colors 38 & 206 to light
-# versions readable on dark red (#3D1111). All WCAG AAA compliant.
+# Light green (#C8E6C9) — easiest color for human eyes:
+#   - Green sits at peak cone sensitivity, least effort to process
+#   - Light pastel = low saturation, minimal fatigue
+#   - ~10:1 contrast with dark text (#1B2E1B)
+#   - True-color black text is perfectly readable on light bg
 
 ESC=$'\e'
 BEL=$'\a'
 
-# Build palette remap: all colors light enough for dark red background
-P=""
-P+="${ESC}]10;#F0F0F0${BEL}"          # default foreground → off-white
-P+="${ESC}]4;0;#C8B8B8${BEL}"          # black   → warm grey
-P+="${ESC}]4;1;#FF8A80${BEL}"          # red     → light red
-P+="${ESC}]4;2;#69F0AE${BEL}"          # green   → light green
-P+="${ESC}]4;3;#FFD740${BEL}"          # yellow  → light amber
-P+="${ESC}]4;4;#82B1FF${BEL}"          # blue    → light blue
-P+="${ESC}]4;5;#EA80FC${BEL}"          # magenta → light purple
-P+="${ESC}]4;6;#84FFFF${BEL}"          # cyan    → light cyan
-P+="${ESC}]4;7;#F5F5F5${BEL}"          # white   → bright white
-P+="${ESC}]4;8;#D0C0C0${BEL}"          # bright black   → lighter grey
-P+="${ESC}]4;9;#FF8A80${BEL}"          # bright red     → light red
-P+="${ESC}]4;10;#69F0AE${BEL}"         # bright green   → light green
-P+="${ESC}]4;11;#FFD740${BEL}"         # bright yellow  → light amber
-P+="${ESC}]4;12;#82B1FF${BEL}"         # bright blue    → light blue
-P+="${ESC}]4;13;#EA80FC${BEL}"         # bright magenta → light purple
-P+="${ESC}]4;14;#84FFFF${BEL}"         # bright cyan    → light cyan
-P+="${ESC}]4;15;#FFFFFF${BEL}"         # bright white   → white
-P+="${ESC}]4;38;#82B1FF${BEL}"         # ext 38  → light blue
-P+="${ESC}]4;206;#FF80AB${BEL}"        # ext 206 → light pink
+# --- Light mint green: gentle on eyes, clear "done" signal ---
+BG_GREEN="#C8E6C9"
+BG_DARK="#1A331A"
 
-RED_FRAME="${ESC}]11;#3D1111${BEL}${P}"
-BLK_FRAME="${ESC}]11;#000000${BEL}${P}"
-SETTLE="${ESC}]11;#3D1111${BEL}${P}"
+# Palette remap: dark tones readable on light green background
+P=""
+P+="${ESC}]10;#1B2E1B${BEL}"          # default foreground -> dark forest
+P+="${ESC}]4;0;#2E4A2E${BEL}"          # black   -> dark green-grey
+P+="${ESC}]4;1;#9B2335${BEL}"          # red     -> deep crimson
+P+="${ESC}]4;2;#2E7D32${BEL}"          # green   -> forest green
+P+="${ESC}]4;3;#8B6914${BEL}"          # yellow  -> dark gold
+P+="${ESC}]4;4;#1565C0${BEL}"          # blue    -> strong blue
+P+="${ESC}]4;5;#7B1FA2${BEL}"          # magenta -> deep purple
+P+="${ESC}]4;6;#00838F${BEL}"          # cyan    -> dark teal
+P+="${ESC}]4;7;#1B2E1B${BEL}"          # white   -> dark forest
+P+="${ESC}]4;8;#3E5A3E${BEL}"          # bright black   -> medium green-grey
+P+="${ESC}]4;9;#C62828${BEL}"          # bright red     -> medium red
+P+="${ESC}]4;10;#388E3C${BEL}"         # bright green   -> medium green
+P+="${ESC}]4;11;#F9A825${BEL}"         # bright yellow  -> amber
+P+="${ESC}]4;12;#1976D2${BEL}"         # bright blue    -> medium blue
+P+="${ESC}]4;13;#8E24AA${BEL}"         # bright magenta -> medium purple
+P+="${ESC}]4;14;#00979D${BEL}"         # bright cyan    -> medium teal
+P+="${ESC}]4;15;#2E4A2E${BEL}"         # bright white   -> dark green-grey
+P+="${ESC}]4;38;#1565C0${BEL}"         # ext 38  -> strong blue
+P+="${ESC}]4;206;#AD1457${BEL}"        # ext 206 -> deep pink
 
 pkill -f kiro-red-flash 2>/dev/null
 pkill -f kiro-input-watch 2>/dev/null
 
-# Record idle time at launch — any new input will make it drop
+# Record idle time at launch
 IDLE_AT_START=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF; exit}')
 
-# Export pre-built escape sequences so subshells inherit them
-export RED_FRAME BLK_FRAME SETTLE
+# Write escape sequences to temp files (avoids nested-quoting issues)
+TMPDIR_FLASH=$(mktemp -d)
+printf '%s' "${ESC}]11;${BG_GREEN}${BEL}${P}" > "$TMPDIR_FLASH/red"
+printf '%s' "${ESC}]11;${BG_DARK}${BEL}${P}" > "$TMPDIR_FLASH/blk"
+printf '%s' "${ESC}]11;${BG_GREEN}${BEL}${P}" > "$TMPDIR_FLASH/settle"
 
-# Start the flash loop as a named process
-nohup bash -c 'exec -a kiro-red-flash bash -c '\''
+# Flash loop script
+cat > "$TMPDIR_FLASH/flash.sh" << 'SCRIPT'
+#!/bin/bash
+DIR="$1"
 while true; do
-  printf "%s" "$RED_FRAME" >/dev/tty
+  cat "$DIR/red" >/dev/tty
   sleep 0.5
-  printf "%s" "$BLK_FRAME" >/dev/tty
+  cat "$DIR/blk" >/dev/tty
   sleep 0.5
 done
-'\''' >/dev/null 2>&1 &
-disown
+SCRIPT
 
-# Poll HIDIdleTime — when it drops below the start value, user touched something
-export IDLE_AT_START
-nohup bash -c 'exec -a kiro-input-watch bash -c '\''
+# Input watch script
+cat > "$TMPDIR_FLASH/watch.sh" << SCRIPT
+#!/bin/bash
+DIR="$TMPDIR_FLASH"
+IDLE_AT_START=$IDLE_AT_START
 while true; do
   sleep 0.15
-  NOW=$(ioreg -c IOHIDSystem | awk "/HIDIdleTime/ {print \$NF; exit}")
-  if [ "$NOW" -lt "$IDLE_AT_START" ]; then
+  NOW=\$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print \$NF; exit}')
+  if [ "\$NOW" -lt "\$IDLE_AT_START" ]; then
     pkill -f kiro-red-flash 2>/dev/null
-    printf "%s" "$SETTLE" >/dev/tty
+    cat "$TMPDIR_FLASH/settle" >/dev/tty
     exit 0
   fi
 done
-'\''' >/dev/null 2>&1 &
+SCRIPT
+
+chmod +x "$TMPDIR_FLASH/flash.sh" "$TMPDIR_FLASH/watch.sh"
+
+# Start flash loop
+nohup bash -c "exec -a kiro-red-flash bash '$TMPDIR_FLASH/flash.sh' '$TMPDIR_FLASH'" >/dev/null 2>&1 &
+disown
+
+# Start input watcher
+nohup bash -c "exec -a kiro-input-watch bash '$TMPDIR_FLASH/watch.sh'" >/dev/null 2>&1 &
 disown
